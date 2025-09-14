@@ -1,0 +1,62 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="row" style="margin-bottom:12px">
+  <form method="get" class="col card" style="display:flex;gap:8px;align-items:center">
+    <input type="text" name="q" placeholder="Search name, email or Slack ID…" value="{{ q }}">
+    <button class="btn">Search</button>
+    <a class="btn" href="{{ url_for('admin_users') }}">Reset</a>
+  </form>
+  <div class="col card">
+    <form method="post" action="{{ url_for('admin_users_new') }}">
+      <div class="row">
+        <div class="col"><label>Slack user ID</label><input name="slack_user_id" required></div>
+        <div class="col"><label>Display name</label><input name="display_name"></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>Email</label><input name="email"></div>
+        <div class="col"><label>Timezone</label><input name="timezone" value="Europe/London"></div>
+        <div class="col"><label>Cadence (days)</label><input name="cadence_days" type="number" value="7" min="1"></div>
+      </div>
+      <div style="margin-top:10px"><button class="btn primary">Add / Update user</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th><th>Slack ID</th><th>Cadence</th><th>Next due</th><th>Last update</th><th>Status</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a href="{{ url_for('admin_user_detail', user_id=r.id) }}">{{ r.display_name }}</a><br><small>{{ r.email or "" }}</small></td>
+        <td><code>{{ r.slack_user_id }}</code><br><small>{{ r.timezone }}</small></td>
+        <td>{{ r.cadence_days }}d</td>
+        <td>{{ r.next_due_at or "—" }}</td>
+        <td>
+          {% if r.last_responded_at %}
+            <small>{{ r.last_responded_at }}</small><br>
+            {% if r.last_rag == 'G' %}<span class="badge green">Green</span>{% elif r.last_rag == 'A' %}<span class="badge amber">Amber</span>{% elif r.last_rag == 'R' %}<span class="badge red">Red</span>{% endif %}
+            <div><small>{{ r.last_summary|default("",true)[:80] }}</small></div>
+          {% else %}
+            <small>—</small>
+          {% endif %}
+        </td>
+        <td>{{ "Active" if r.is_active else "Paused" }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=r.id) }}">
+            <button class="btn primary">Chase now</button>
+          </form>
+          <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=r.id) }}">
+            <button class="btn">{{ "Pause" if r.is_active else "Resume" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
