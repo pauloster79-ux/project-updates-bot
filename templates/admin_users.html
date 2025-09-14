@@ -1,82 +1,94 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Project Updates Bot – Admin</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background: #f9f9f9;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            background: white;
-        }
-        th, td {
-            text-align: left;
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #f2f2f2;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        h1 {
-            margin-bottom: 10px;
-        }
-        .form-inline {
-            margin-bottom: 20px;
-        }
-        input[type="text"] {
-            padding: 6px;
-            margin-right: 10px;
-        }
-        button {
-            padding: 6px 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Admin: Users</h1>
+{% extends "admin_base.html" %}
+{% block content %}
 
-    <form method="get" class="form-inline">
-        <input type="text" name="q" placeholder="Search..." value="{{ q or '' }}">
-        <button type="submit">Search</button>
+<div class="row" style="margin-bottom:12px">
+  <!-- Search -->
+  <form method="get" class="col card" style="display:flex;gap:8px;align-items:center">
+    <input type="text" name="q" placeholder="Search name, email or Slack ID…" value="{{ q or '' }}">
+    <button class="btn">Search</button>
+    <a class="btn" href="{{ url_for('admin_users') }}">Reset</a>
+  </form>
+
+  <!-- Add / Update -->
+  <div class="col card">
+    <h3 style="margin-top:0">Add / Update User</h3>
+    <form method="post" action="{{ url_for('admin_users_new') }}">
+      <div class="row">
+        <div class="col">
+          <label>Slack user ID</label>
+          <input name="slack_user_id" placeholder="e.g. U012AB3CDE" required>
+          <small>In Slack: user profile → ••• → <em>Copy member ID</em>.</small>
+        </div>
+        <div class="col">
+          <label>Display name</label>
+          <input name="display_name" placeholder="Optional – defaults to Slack ID">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>Email</label>
+          <input name="email" placeholder="Optional">
+        </div>
+        <div class="col">
+          <label>Timezone</label>
+          <input name="timezone" value="Europe/London" placeholder="IANA TZ e.g. Europe/London">
+        </div>
+        <div class="col">
+          <label>Cadence (days)</label>
+          <input name="cadence_days" type="number" min="1" value="7">
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn primary">Save user</button>
+      </div>
     </form>
+  </div>
+</div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Slack ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Timezone</th>
-                <th>Cadence</th>
-                <th>Last Prompt</th>
-                <th>Next Due</th>
-                <th>Last Summary</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in rows %}
-            <tr>
-                <td>{{ r.slack_user_id }}</td>
-                <td>{{ r.display_name }}</td>
-                <td>{{ r.email }}</td>
-                <td>{{ r.timezone }}</td>
-                <td>{{ r.cadence_days }}d</td>
-                <td>{{ r.last_prompt_at or '' }}</td>
-                <td>{{ r.next_due_at or '' }}</td>
-                <td><small>{{ r.last_summary | default('', true) | truncate(80, True) }}</small></td>
-                <td>{{ '✅ Active' if r.is_active else '❌ Inactive' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</body>
-</html>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Slack ID</th>
+        <th>Email</th>
+        <th>Timezone</th>
+        <th>Cadence</th>
+        <th>Last Prompt</th>
+        <th>Next Due</th>
+        <th>Last Summary</th>
+        <th>Status</th>
+        <th style="width:220px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>
+          <a href="{{ url_for('admin_user_detail', user_id=r.id) }}">{{ r.display_name }}</a>
+        </td>
+        <td><code>{{ r.slack_user_id }}</code></td>
+        <td>{{ r.email or '' }}</td>
+        <td>{{ r.timezone or '' }}</td>
+        <td>{{ r.cadence_days }}d</td>
+        <td>{{ r.last_prompt_at or '—' }}</td>
+        <td>{{ r.next_due_at or '—' }}</td>
+        <td><small>{{ r.last_summary | default('', true) | truncate(80, True) }}</small></td>
+        <td>{{ 'Active' if r.is_active else 'Paused' }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=r.id) }}">
+            <button class="btn primary">Chase now</button>
+          </form>
+          <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=r.id) }}">
+            <button class="btn">{{ "Pause" if r.is_active else "Resume" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" style="text-align:center;color:#64748b">No users yet — add one above.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
