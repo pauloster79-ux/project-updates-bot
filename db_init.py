@@ -1,4 +1,4 @@
-# db_init.py  — portable schema for SQLite & Postgres
+# Portable DB schema for Postgres (Render) and SQLite (local)
 import os
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
@@ -8,13 +8,13 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
 engine = create_engine(DATABASE_URL, future=True)
 
-def schema_for(dialect: str) -> str:
-    if dialect.startswith("postgres"):
-        # Postgres DDL
+
+def schema_for(url: str) -> str:
+    if url.startswith("postgres"):
         return """
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
-          slack_user_id TEXT NOT NULL,
+          slack_user_id TEXT UNIQUE NOT NULL,
           display_name TEXT NOT NULL,
           email TEXT,
           timezone TEXT DEFAULT 'Europe/London',
@@ -39,11 +39,10 @@ def schema_for(dialect: str) -> str:
         );
         """
     else:
-        # SQLite DDL
         return """
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          slack_user_id TEXT NOT NULL,
+          slack_user_id TEXT UNIQUE NOT NULL,
           display_name TEXT NOT NULL,
           email TEXT,
           timezone TEXT DEFAULT 'Europe/London',
@@ -68,6 +67,7 @@ def schema_for(dialect: str) -> str:
         );
         """
 
+
 def main():
     ddl = schema_for(DATABASE_URL)
     with engine.begin() as conn:
@@ -75,6 +75,7 @@ def main():
             if stmt.strip():
                 conn.execute(text(stmt.strip()))
     print("✅ Tables ensured")
+
 
 if __name__ == "__main__":
     main()
