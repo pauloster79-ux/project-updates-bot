@@ -1,62 +1,82 @@
-{% extends "admin_base.html" %}
-{% block content %}
-<div class="row" style="margin-bottom:12px">
-  <form method="get" class="col card" style="display:flex;gap:8px;align-items:center">
-    <input type="text" name="q" placeholder="Search name, email or Slack ID…" value="{{ q }}">
-    <button class="btn">Search</button>
-    <a class="btn" href="{{ url_for('admin_users') }}">Reset</a>
-  </form>
-  <div class="col card">
-    <form method="post" action="{{ url_for('admin_users_new') }}">
-      <div class="row">
-        <div class="col"><label>Slack user ID</label><input name="slack_user_id" required></div>
-        <div class="col"><label>Display name</label><input name="display_name"></div>
-      </div>
-      <div class="row">
-        <div class="col"><label>Email</label><input name="email"></div>
-        <div class="col"><label>Timezone</label><input name="timezone" value="Europe/London"></div>
-        <div class="col"><label>Cadence (days)</label><input name="cadence_days" type="number" value="7" min="1"></div>
-      </div>
-      <div style="margin-top:10px"><button class="btn primary">Add / Update user</button></div>
-    </form>
-  </div>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Project Updates Bot – Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background: white;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        h1 {
+            margin-bottom: 10px;
+        }
+        .form-inline {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            padding: 6px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 6px 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin: Users</h1>
 
-<div class="card">
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th><th>Slack ID</th><th>Cadence</th><th>Next due</th><th>Last update</th><th>Status</th><th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in rows %}
-      <tr>
-        <td><a href="{{ url_for('admin_user_detail', user_id=r.id) }}">{{ r.display_name }}</a><br><small>{{ r.email or "" }}</small></td>
-        <td><code>{{ r.slack_user_id }}</code><br><small>{{ r.timezone }}</small></td>
-        <td>{{ r.cadence_days }}d</td>
-        <td>{{ r.next_due_at or "—" }}</td>
-        <td>
-          {% if r.last_responded_at %}
-            <small>{{ r.last_responded_at }}</small><br>
-            {% if r.last_rag == 'G' %}<span class="badge green">Green</span>{% elif r.last_rag == 'A' %}<span class="badge amber">Amber</span>{% elif r.last_rag == 'R' %}<span class="badge red">Red</span>{% endif %}
-            <div><small>{{ r.last_summary|default("",true)[:80] }}</small></div>
-          {% else %}
-            <small>—</small>
-          {% endif %}
-        </td>
-        <td>{{ "Active" if r.is_active else "Paused" }}</td>
-        <td>
-          <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=r.id) }}">
-            <button class="btn primary">Chase now</button>
-          </form>
-          <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=r.id) }}">
-            <button class="btn">{{ "Pause" if r.is_active else "Resume" }}</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endblock %}
+    <form method="get" class="form-inline">
+        <input type="text" name="q" placeholder="Search..." value="{{ q or '' }}">
+        <button type="submit">Search</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Slack ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Timezone</th>
+                <th>Cadence</th>
+                <th>Last Prompt</th>
+                <th>Next Due</th>
+                <th>Last Summary</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr>
+                <td>{{ r.slack_user_id }}</td>
+                <td>{{ r.display_name }}</td>
+                <td>{{ r.email }}</td>
+                <td>{{ r.timezone }}</td>
+                <td>{{ r.cadence_days }}d</td>
+                <td>{{ r.last_prompt_at or '' }}</td>
+                <td>{{ r.next_due_at or '' }}</td>
+                <td><small>{{ r.last_summary | default('', true) | truncate(80, True) }}</small></td>
+                <td>{{ '✅ Active' if r.is_active else '❌ Inactive' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
