@@ -1,0 +1,33 @@
+{% extends "admin_base.html" %}
+{% block content %}
+<div class="card">
+  <h2>{{ user.display_name }}</h2>
+  <p><strong>Slack:</strong> <code>{{ user.slack_user_id }}</code> &nbsp; <strong>Email:</strong> {{ user.email or "—" }}</p>
+  <p><strong>Timezone:</strong> {{ user.timezone }} &nbsp; <strong>Cadence:</strong> {{ user.cadence_days or 7 }}d</p>
+  <p><strong>Next due:</strong> {{ user.next_due_at or "—" }} &nbsp; <strong>Last prompt:</strong> {{ user.last_prompt_at or "—" }}</p>
+  <div style="margin-top:8px">
+    <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=user.id) }}"><button class="btn primary">Chase now</button></form>
+    <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=user.id) }}"><button class="btn">{{ "Pause" if user.is_active else "Resume" }}</button></form>
+    <a class="btn" href="{{ url_for('admin_users') }}">Back</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>Update history</h3>
+  <table>
+    <thead><tr><th>Responded</th><th>RAG</th><th>%</th><th>ETA</th><th>Summary</th><th>Blockers</th></tr></thead>
+    <tbody>
+      {% for u in updates %}
+      <tr>
+        <td>{{ u.responded_at or "—" }}</td>
+        <td>{{ u.rag or "—" }}</td>
+        <td>{{ u.progress_pct or "—" }}</td>
+        <td>{{ u.eta_date or "—" }}</td>
+        <td>{{ u.summary or "—" }}</td>
+        <td>{{ u.blockers or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
