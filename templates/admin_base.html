@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Project Updates Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#f6f7f9}
+    header{background:#0f172a;color:#fff;padding:14px 20px}
+    a{color:#0f766e;text-decoration:none}
+    .wrap{max-width:1100px;margin:20px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #eee;vertical-align:top}
+    th{text-align:left;color:#334155}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
+    .btn.primary{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
+    .btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+    .badge{padding:2px 8px;border-radius:999px;font-size:12px}
+    .badge.green{background:#dcfce7;color:#166534}
+    .badge.amber{background:#fef9c3;color:#a16207}
+    .badge.red{background:#fee2e2;color:#991b1b}
+    .flash{padding:10px;margin-bottom:12px;border-radius:8px}
+    .flash.success{background:#dcfce7;color:#166534}
+    .flash.error{background:#fee2e2;color:#991b1b}
+    form.inline{display:inline}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > .col{flex:1;min-width:260px}
+    input,select{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
+    <div><strong>Project Updates — Admin</strong></div>
+    <nav>
+      <a href="{{ url_for('admin_users') }}" style="color:#fff;margin-right:16px">Users</a>
+      <a href="{{ url_for('admin_logout') }}" style="color:#fff">Logout</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat,msg in messages %}
+        <div class="flash {{cat}}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>
