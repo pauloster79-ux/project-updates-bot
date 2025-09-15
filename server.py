@@ -2,57 +2,36 @@ import os
 import json
 from datetime import datetime, timedelta, date
 
-from flask import (
-    Flask, request, jsonify, session, redirect, url_for, render_template
-)
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
 
 from sqlalchemy import create_engine, text
 from slack_sdk import WebClient
 
-
 # -----------------------------------------------------------------------------
-# App & config
+# Config
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
-
-# Required env vars you should have set in Render:
-#   SLACK_BOT_TOKEN        -> xoxb-...
-#   SECRET_KEY             -> any long random string (for Flask sessions)
-#   ADMIN_PASSWORD         -> the password you use at /admin/login
-#   DATABASE_URL           -> Render Postgres URL (or we'll fall back to SQLite)
 app.secret_key = os.getenv("SECRET_KEY", "change-me")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
 engine = create_engine(DATABASE_URL, future=True)
 
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")  # optional for "Chase now"
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 slack = WebClient(token=SLACK_BOT_TOKEN) if SLACK_BOT_TOKEN else None
 
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 # -----------------------------------------------------------------------------
-# Small helpers
+# DB bootstrap
 # -----------------------------------------------------------------------------
-def admin_required(f):
-    @wraps(f)
-    def _wrap(*args, **kwargs):
-        if not session.get("admin_ok"):
-            return redirect(url_for("admin_login"))
-        return f(*args, **kwargs)
-    return _wrap
-
-
 def ensure_tables():
-    """
-    Safe to run repeatedly. For Postgres we also add columns that might be
-    missing if you created tables earlier.
-    """
     with engine.begin() as conn:
-        # USERS
+        # users
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             id              SERIAL PRIMARY KEY,
-            slack_user_id   TEXT UNIQUE NOT NULL,
+            slack_user_id   TEXT NOT NULL,
             display_name    TEXT NOT NULL,
             email           TEXT,
             timezone        TEXT DEFAULT 'Europe/London',
@@ -66,9 +45,8 @@ def ensure_tables():
             escalate_to     TEXT
         );
         """))
-
-        # Add missing columns if needed (Postgres)
         if engine.url.get_backend_name().startswith("postgres"):
+            # add columns if missing (no-ops if exist)
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/London';"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS cadence_days INTEGER DEFAULT 7;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_hour INTEGER;"))
@@ -78,8 +56,19 @@ def ensure_tables():
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS project TEXT;"))
             conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS escalate_to TEXT;"))
-
-        # UPDATES (optional history)
+            # make slack_user_id unique so upserts work
+            conn.execute(text("""
+                DO $$
+                BEGIN
+                  IF NOT EXISTS (
+                    SELECT 1 FROM pg_indexes
+                     WHERE schemaname='public' AND indexname='users_slack_user_id_uniq_idx'
+                  ) THEN
+                    CREATE UNIQUE INDEX users_slack_user_id_uniq_idx ON users(slack_user_id);
+                  END IF;
+                END $$;
+            """))
+        # updates
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS updates (
             id             SERIAL PRIMARY KEY,
@@ -97,24 +86,48 @@ def ensure_tables():
         );
         """))
 
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+def admin_required(f):
+    @wraps(f)
+    def _wrap(*args, **kwargs):
+        if not session.get("admin_ok"):
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return _wrap
 
 def send_prompt_to_user(slack_user_id: str):
-    """
-    Minimal 'chase now' DM. Requires SLACK_BOT_TOKEN.
-    You can replace this with your modal logic later.
-    """
     if not slack:
         return
-
     try:
         slack.chat_postMessage(
             channel=slack_user_id,
             text="👋 Quick project update, please!\n• Progress since last check-in\n• Any blockers\n• ETA/next steps"
         )
     except Exception:
-        # Ignore errors to avoid breaking admin UI
         pass
 
+def find_or_create_user_from_slack(slack_user_id: str) -> int | None:
+    """Ensure the user exists in DB; return user_id."""
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM users WHERE slack_user_id = :sid"),
+            {"sid": slack_user_id}
+        ).first()
+        if row:
+            return row[0]
+        # fallback: create with minimal details
+        conn.execute(text("""
+            INSERT INTO users (slack_user_id, display_name)
+            VALUES (:sid, :name)
+            ON CONFLICT (slack_user_id) DO NOTHING
+        """), {"sid": slack_user_id, "name": slack_user_id})
+        row2 = conn.execute(
+            text("SELECT id FROM users WHERE slack_user_id = :sid"),
+            {"sid": slack_user_id}
+        ).first()
+        return row2[0] if row2 else None
 
 # -----------------------------------------------------------------------------
 # Public routes
@@ -123,47 +136,82 @@ def send_prompt_to_user(slack_user_id: str):
 def index():
     return jsonify({"name": "Project Updates Bot", "ok": True, "status": "live"})
 
-
+# Slack Events: verify & handle DMs (message.im)
 @app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
-    """
-    Keeps Slack Event Subscriptions happy.
-    - GET → simple OK
-    - POST:
-        * url_verification → echo challenge
-        * everything else → 200 (no-op for now)
-    """
     if request.method == "GET":
         return jsonify({"ok": True})
 
     body = request.get_json(silent=True) or {}
+    # URL verification handshake
     if body.get("type") == "url_verification":
         return jsonify({"challenge": body.get("challenge")})
-    # TODO: handle app_mention / message events if you want
-    return jsonify({"ok": True})
 
+    # Events API payload
+    if body.get("type") == "event_callback":
+        event = body.get("event", {})
+        # Ignore bot messages & edits
+        if event.get("subtype") in {"bot_message", "message_changed", "message_deleted"}:
+            return jsonify({"ok": True})
+
+        # Direct message to the bot
+        if event.get("type") == "message" and event.get("channel_type") == "im":
+            user_id = event.get("user")
+            text_in = (event.get("text") or "").strip()
+            ts = event.get("ts")
+            if user_id and text_in:
+                # ensure user exists
+                uid = find_or_create_user_from_slack(user_id)
+                # store update
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        INSERT INTO updates (user_id, responded_at, summary, raw_text, source)
+                        VALUES (:uid, NOW(), :summary, :raw, 'dm')
+                    """), {"uid": uid, "summary": text_in, "raw": json.dumps(event)})
+                # friendly ack (in same DM)
+                if slack:
+                    try:
+                        slack.chat_postMessage(
+                            channel=user_id,
+                            text="✅ Thanks — noted. I’ll include this in the roll‑up.",
+                            thread_ts=ts  # keep tidy in a thread
+                        )
+                    except Exception:
+                        pass
+            return jsonify({"ok": True})
+
+        # Optional: channel mentions
+        if event.get("type") == "app_mention":
+            if slack:
+                try:
+                    slack.chat_postMessage(
+                        channel=event.get("channel"),
+                        text="👋 DM me directly for updates, or ask an admin to schedule a chase."
+                    )
+                except Exception:
+                    pass
+            return jsonify({"ok": True})
+
+    return jsonify({"ok": True})
 
 # -----------------------------------------------------------------------------
 # Admin auth
 # -----------------------------------------------------------------------------
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
-    admin_pw = os.getenv("ADMIN_PASSWORD", "")
     if request.method == "POST":
-        if admin_pw and request.form.get("password") == admin_pw:
+        if ADMIN_PASSWORD and request.form.get("password") == ADMIN_PASSWORD:
             session["admin_ok"] = True
             return redirect(url_for("admin_users"))
     return render_template("admin_login.html")
-
 
 @app.get("/admin/logout")
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
 
-
 # -----------------------------------------------------------------------------
-# Admin: Users (list, create/update, toggle, chase, detail)
+# Admin: Users
 # -----------------------------------------------------------------------------
 @app.get("/admin/users")
 @admin_required
@@ -191,7 +239,6 @@ def admin_users():
         rows = conn.execute(text(sql), params).mappings().all()
 
     return render_template("admin_users.html", rows=rows, q=q)
-
 
 @app.post("/admin/users/new")
 @admin_required
@@ -229,7 +276,6 @@ def admin_users_new():
                   cadence_days = EXCLUDED.cadence_days;
             """), vals)
         else:
-            # SQLite fallback
             existing = conn.execute(
                 text("SELECT id FROM users WHERE slack_user_id = :sid"),
                 {"sid": slack_user_id}
@@ -251,7 +297,6 @@ def admin_users_new():
 
     return redirect(url_for("admin_users"))
 
-
 @app.post("/admin/users/<int:user_id>/toggle")
 @admin_required
 def admin_users_toggle(user_id: int):
@@ -263,7 +308,6 @@ def admin_users_toggle(user_id: int):
         """), {"id": user_id})
     return redirect(url_for("admin_users"))
 
-
 @app.post("/admin/users/<int:user_id>/chase")
 @admin_required
 def admin_users_chase(user_id: int):
@@ -274,7 +318,6 @@ def admin_users_chase(user_id: int):
         ).mappings().first()
     if user and user.get("slack_user_id"):
         send_prompt_to_user(user["slack_user_id"])
-        # update last_prompt_at / next_due_at
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE users
@@ -283,7 +326,6 @@ def admin_users_chase(user_id: int):
                  WHERE id = :id
             """), {"id": user_id})
     return redirect(url_for("admin_users"))
-
 
 @app.get("/admin/users/<int:user_id>")
 @admin_required
@@ -306,12 +348,10 @@ def admin_user_detail(user_id: int):
             {"id": user_id}
         ).mappings().all()
 
-    # Fallback page if you haven’t created admin_user_detail.html yet
     try:
         return render_template("admin_user_detail.html", user=user, updates=updates)
     except Exception:
         return jsonify({"user": dict(user) if user else None, "updates": [dict(u) for u in updates]})
-
 
 # -----------------------------------------------------------------------------
 # Entrypoint
