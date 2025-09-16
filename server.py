@@ -4,12 +4,11 @@ from datetime import datetime, timedelta, date
 
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
-
 from sqlalchemy import create_engine, text
 from slack_sdk import WebClient
 
 # -----------------------------------------------------------------------------
-# Config
+# App & Config
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "change-me")
@@ -17,17 +16,17 @@ app.secret_key = os.getenv("SECRET_KEY", "change-me")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data.db")
 engine = create_engine(DATABASE_URL, future=True)
 
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN", "")
 slack = WebClient(token=SLACK_BOT_TOKEN) if SLACK_BOT_TOKEN else None
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 # -----------------------------------------------------------------------------
-# DB bootstrap
+# Bootstrap DB (idempotent)
 # -----------------------------------------------------------------------------
 def ensure_tables():
     with engine.begin() as conn:
-        # users
+        # users table
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             id              SERIAL PRIMARY KEY,
@@ -45,30 +44,24 @@ def ensure_tables():
             escalate_to     TEXT
         );
         """))
+        # make slack_user_id unique (needed for upsert)
         if engine.url.get_backend_name().startswith("postgres"):
-            # add columns if missing (no-ops if exist)
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/London';"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS cadence_days INTEGER DEFAULT 7;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_hour INTEGER;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_dow INTEGER;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_prompt_at TIMESTAMP;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS next_due_at TIMESTAMP;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS project TEXT;"))
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS escalate_to TEXT;"))
-            # make slack_user_id unique so upserts work
             conn.execute(text("""
                 DO $$
                 BEGIN
                   IF NOT EXISTS (
-                    SELECT 1 FROM pg_indexes
-                     WHERE schemaname='public' AND indexname='users_slack_user_id_uniq_idx'
+                    SELECT 1
+                      FROM pg_indexes
+                     WHERE schemaname='public'
+                       AND indexname='users_slack_user_id_uniq_idx'
                   ) THEN
-                    CREATE UNIQUE INDEX users_slack_user_id_uniq_idx ON users(slack_user_id);
+                    CREATE UNIQUE INDEX users_slack_user_id_uniq_idx
+                      ON users(slack_user_id);
                   END IF;
                 END $$;
             """))
-        # updates
+
+        # updates table (history of user replies)
         conn.execute(text("""
         CREATE TABLE IF NOT EXISTS updates (
             id             SERIAL PRIMARY KEY,
@@ -98,18 +91,21 @@ def admin_required(f):
     return _wrap
 
 def send_prompt_to_user(slack_user_id: str):
+    """Minimal 'chase now' DM."""
     if not slack:
+        app.logger.warning("SLACK_BOT_TOKEN not set; cannot DM")
         return
     try:
         slack.chat_postMessage(
             channel=slack_user_id,
             text="👋 Quick project update, please!\n• Progress since last check-in\n• Any blockers\n• ETA/next steps"
         )
-    except Exception:
-        pass
+        app.logger.info(f"Sent chase DM to {slack_user_id}")
+    except Exception as e:
+        app.logger.exception(f"Failed to DM {slack_user_id}: {e}")
 
-def find_or_create_user_from_slack(slack_user_id: str) -> int | None:
-    """Ensure the user exists in DB; return user_id."""
+def find_or_create_user(slack_user_id: str) -> int | None:
+    """Return users.id for a slack_user_id (create if missing)."""
     with engine.begin() as conn:
         row = conn.execute(
             text("SELECT id FROM users WHERE slack_user_id = :sid"),
@@ -117,7 +113,7 @@ def find_or_create_user_from_slack(slack_user_id: str) -> int | None:
         ).first()
         if row:
             return row[0]
-        # fallback: create with minimal details
+        # create minimal record
         conn.execute(text("""
             INSERT INTO users (slack_user_id, display_name)
             VALUES (:sid, :name)
@@ -136,63 +132,80 @@ def find_or_create_user_from_slack(slack_user_id: str) -> int | None:
 def index():
     return jsonify({"name": "Project Updates Bot", "ok": True, "status": "live"})
 
-# Slack Events: verify & handle DMs (message.im)
+# --- Slack Events endpoint (handles URL verification + DM messages) ---
 @app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
+    # Slack sometimes probes with GET; answer 200
     if request.method == "GET":
         return jsonify({"ok": True})
 
-    body = request.get_json(silent=True) or {}
-    # URL verification handshake
-    if body.get("type") == "url_verification":
-        return jsonify({"challenge": body.get("challenge")})
+    payload = request.get_json(silent=True) or {}
+    app.logger.info(f"/slack/events payload: {payload}")
 
-    # Events API payload
-    if body.get("type") == "event_callback":
-        event = body.get("event", {})
-        # Ignore bot messages & edits
-        if event.get("subtype") in {"bot_message", "message_changed", "message_deleted"}:
-            return jsonify({"ok": True})
+    # 1) URL verification challenge
+    if payload.get("type") == "url_verification":
+        return jsonify({"challenge": payload.get("challenge")})
 
-        # Direct message to the bot
-        if event.get("type") == "message" and event.get("channel_type") == "im":
-            user_id = event.get("user")
-            text_in = (event.get("text") or "").strip()
-            ts = event.get("ts")
-            if user_id and text_in:
-                # ensure user exists
-                uid = find_or_create_user_from_slack(user_id)
-                # store update
-                with engine.begin() as conn:
-                    conn.execute(text("""
-                        INSERT INTO updates (user_id, responded_at, summary, raw_text, source)
-                        VALUES (:uid, NOW(), :summary, :raw, 'dm')
-                    """), {"uid": uid, "summary": text_in, "raw": json.dumps(event)})
-                # friendly ack (in same DM)
-                if slack:
-                    try:
-                        slack.chat_postMessage(
-                            channel=user_id,
-                            text="✅ Thanks — noted. I’ll include this in the roll‑up.",
-                            thread_ts=ts  # keep tidy in a thread
-                        )
-                    except Exception:
-                        pass
-            return jsonify({"ok": True})
+    # 2) Only process event callbacks
+    if payload.get("type") != "event_callback":
+        return ("", 200)
 
-        # Optional: channel mentions
-        if event.get("type") == "app_mention":
-            if slack:
-                try:
-                    slack.chat_postMessage(
-                        channel=event.get("channel"),
-                        text="👋 DM me directly for updates, or ask an admin to schedule a chase."
-                    )
-                except Exception:
-                    pass
-            return jsonify({"ok": True})
+    event = payload.get("event", {}) or {}
+    etype = event.get("type")
+    subtype = event.get("subtype")
+    channel_type = event.get("channel_type")
+    user_id = event.get("user")
+    text_in = (event.get("text") or "").strip()
+    ts = event.get("ts")
 
-    return jsonify({"ok": True})
+    # Ignore non-message events, bot/system messages, non-DMs, empties
+    if etype != "message":
+        app.logger.info(f"Ignoring non-message event: {etype}")
+        return ("", 200)
+    if subtype:
+        app.logger.info(f"Ignoring message with subtype={subtype}")
+        return ("", 200)
+    if channel_type != "im":
+        app.logger.info(f"Ignoring non-DM message channel_type={channel_type}")
+        return ("", 200)
+    if not user_id or not text_in:
+        app.logger.info("Missing user or empty text; ignoring")
+        return ("", 200)
+
+    app.logger.info(f"DM from {user_id}: {text_in}")
+
+    # Ensure user exists; write an updates row; (admin table shows last_summary via subquery)
+    try:
+        uid = find_or_create_user(user_id)
+        if uid is None:
+            app.logger.error(f"Could not resolve/create user for {user_id}")
+            return ("", 200)
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO updates (user_id, responded_at, summary, raw_payload, raw_text, source)
+                VALUES (:uid, NOW(), :summary, :payload, :raw_text, 'dm')
+            """), {
+                "uid": uid,
+                "summary": text_in,
+                "payload": json.dumps(payload),
+                "raw_text": text_in
+            })
+        app.logger.info(f"Saved update row for {user_id} (user_id={uid})")
+    except Exception as e:
+        app.logger.exception(f"DB insert failed for DM {user_id}: {e}")
+
+    # Optional friendly ack in a thread
+    if slack and ts:
+        try:
+            slack.chat_postMessage(
+                channel=user_id,
+                text="✅ Thanks — noted. I’ll include this in the roll‑up.",
+                thread_ts=ts
+            )
+        except Exception as e:
+            app.logger.warning(f"Ack DM failed for {user_id}: {e}")
+
+    return ("", 200)
 
 # -----------------------------------------------------------------------------
 # Admin auth
@@ -211,7 +224,7 @@ def admin_logout():
     return redirect(url_for("admin_login"))
 
 # -----------------------------------------------------------------------------
-# Admin: Users
+# Admin: Users pages
 # -----------------------------------------------------------------------------
 @app.get("/admin/users")
 @admin_required
@@ -354,7 +367,7 @@ def admin_user_detail(user_id: int):
         return jsonify({"user": dict(user) if user else None, "updates": [dict(u) for u in updates]})
 
 # -----------------------------------------------------------------------------
-# Entrypoint
+# Entrypoint (only for local dev; Render runs gunicorn via start command)
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     ensure_tables()
