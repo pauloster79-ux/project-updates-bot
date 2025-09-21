@@ -78,6 +78,10 @@ def ensure_tables():
             source         TEXT
         );
         """))
+        
+        # Make prompted_at nullable if it's not already (for existing databases)
+        if engine.url.get_backend_name().startswith("postgres"):
+            conn.execute(text("ALTER TABLE updates ALTER COLUMN prompted_at DROP NOT NULL;"))
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -182,8 +186,8 @@ def slack_events():
             return ("", 200)
         with engine.begin() as conn:
             conn.execute(text("""
-                INSERT INTO updates (user_id, responded_at, summary, raw_payload, raw_text, source)
-                VALUES (:uid, NOW(), :summary, :payload, :raw_text, 'dm')
+                INSERT INTO updates (user_id, prompted_at, responded_at, summary, raw_payload, raw_text, source)
+                VALUES (:uid, NOW(), NOW(), :summary, :payload, :raw_text, 'dm')
             """), {
                 "uid": uid,
                 "summary": text_in,
