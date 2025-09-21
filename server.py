@@ -237,7 +237,10 @@ def admin_users():
           (
             SELECT summary FROM updates
              WHERE user_id = u.id
-          ORDER BY COALESCE(responded_at, '1900-01-01') DESC, id DESC
+          ORDER BY 
+            CASE WHEN responded_at IS NULL THEN 0 ELSE 1 END DESC,
+            responded_at DESC, 
+            id DESC
              LIMIT 1
           ) AS last_summary
         FROM users u
