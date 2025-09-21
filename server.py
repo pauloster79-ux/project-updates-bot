@@ -185,15 +185,29 @@ def slack_events():
             app.logger.error(f"Could not resolve/create user for {user_id}")
             return ("", 200)
         with engine.begin() as conn:
-            conn.execute(text("""
-                INSERT INTO updates (user_id, prompted_at, responded_at, summary, raw_payload, raw_text, source)
-                VALUES (:uid, NOW(), NOW(), :summary, :payload, :raw_text, 'dm')
-            """), {
-                "uid": uid,
-                "summary": text_in,
-                "payload": json.dumps(payload),
-                "raw_text": text_in
-            })
+            # Try the new format first, fall back to old format if needed
+            try:
+                conn.execute(text("""
+                    INSERT INTO updates (user_id, prompted_at, responded_at, summary, raw_payload, raw_text, source)
+                    VALUES (:uid, NOW(), NOW(), :summary, :payload, :raw_text, 'dm')
+                """), {
+                    "uid": uid,
+                    "summary": text_in,
+                    "payload": json.dumps(payload),
+                    "raw_text": text_in
+                })
+            except Exception as e:
+                # Fallback to old format if prompted_at column doesn't exist or has constraints
+                app.logger.warning(f"New format failed, trying old format: {e}")
+                conn.execute(text("""
+                    INSERT INTO updates (user_id, responded_at, summary, raw_payload, raw_text, source)
+                    VALUES (:uid, NOW(), :summary, :payload, :raw_text, 'dm')
+                """), {
+                    "uid": uid,
+                    "summary": text_in,
+                    "payload": json.dumps(payload),
+                    "raw_text": text_in
+                })
         app.logger.info(f"Saved update row for {user_id} (user_id={uid})")
     except Exception as e:
         app.logger.exception(f"DB insert failed for DM {user_id}: {e}")
