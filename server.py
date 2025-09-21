@@ -81,7 +81,14 @@ def ensure_tables():
         
         # Make prompted_at nullable if it's not already (for existing databases)
         if engine.url.get_backend_name().startswith("postgres"):
-            conn.execute(text("ALTER TABLE updates ALTER COLUMN prompted_at DROP NOT NULL;"))
+            try:
+                conn.execute(text("ALTER TABLE updates ALTER COLUMN prompted_at DROP NOT NULL;"))
+                app.logger.info("Successfully made prompted_at nullable")
+            except Exception as e:
+                app.logger.warning(f"Could not make prompted_at nullable: {e}")
+        else:
+            # For SQLite, the column is already nullable by default
+            pass
 
 # -----------------------------------------------------------------------------
 # Helpers
