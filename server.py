@@ -237,16 +237,22 @@ def admin_users():
           (
             SELECT summary FROM updates
              WHERE user_id = u.id
-          ORDER BY responded_at DESC NULLS LAST, id DESC
+          ORDER BY COALESCE(responded_at, '1900-01-01') DESC, id DESC
              LIMIT 1
           ) AS last_summary
         FROM users u
     """
     params = {}
     if q:
-        sql += " WHERE u.slack_user_id ILIKE :q OR u.display_name ILIKE :q OR COALESCE(u.email,'') ILIKE :q"
+        if engine.url.get_backend_name().startswith("postgres"):
+            sql += " WHERE u.slack_user_id ILIKE :q OR u.display_name ILIKE :q OR COALESCE(u.email,'') ILIKE :q"
+        else:
+            sql += " WHERE LOWER(u.slack_user_id) LIKE LOWER(:q) OR LOWER(u.display_name) LIKE LOWER(:q) OR LOWER(COALESCE(u.email,'')) LIKE LOWER(:q)"
         params["q"] = f"%{q}%"
-    sql += " ORDER BY u.display_name NULLS LAST, u.slack_user_id"
+    if engine.url.get_backend_name().startswith("postgres"):
+        sql += " ORDER BY u.display_name NULLS LAST, u.slack_user_id"
+    else:
+        sql += " ORDER BY COALESCE(u.display_name, '') DESC, u.slack_user_id"
 
     with engine.begin() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
