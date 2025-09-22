@@ -1,0 +1,66 @@
+{
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "✅ *Update Created*\nYour progress has been shared with the team"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "block_id": "card_update_123",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*API Integration Complete*\n_Backend services now connected to Slack_"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "👤 You • 📅 2025-09-22 • ✅ completed"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "card_action_view",
+          "text": {
+            "type": "plain_text",
+            "text": "View in Home"
+          },
+          "value": "update_123"
+        },
+        {
+          "type": "button",
+          "action_id": "card_action_edit",
+          "text": {
+            "type": "plain_text",
+            "text": "Edit"
+          },
+          "value": "update_123"
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "📌 This update is now visible in your team's Overview tab"
+        }
+      ]
+    }
+  ]
+}

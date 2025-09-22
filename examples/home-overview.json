@@ -1,0 +1,199 @@
+{
+  "type": "home",
+  "blocks": [
+    {
+      "type": "section",
+      "block_id": "home_header",
+      "text": {
+        "type": "mrkdwn",
+        "text": "📌 *Project Updates*\nTrack team progress and manage updates"
+      },
+      "accessory": {
+        "type": "overflow",
+        "action_id": "header_actions",
+        "options": [
+          {
+            "text": {
+              "type": "plain_text",
+              "text": "Refresh"
+            },
+            "value": "refresh"
+          }
+        ]
+      }
+    },
+    {
+      "type": "actions",
+      "block_id": "home_tabs",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "tab_overview",
+          "text": {
+            "type": "plain_text",
+            "text": "🧭 Overview"
+          },
+          "style": "primary",
+          "value": "overview"
+        },
+        {
+          "type": "button",
+          "action_id": "tab_my_updates",
+          "text": {
+            "type": "plain_text",
+            "text": "👤 My Updates"
+          },
+          "value": "my-updates"
+        },
+        {
+          "type": "button",
+          "action_id": "tab_admin",
+          "text": {
+            "type": "plain_text",
+            "text": "⚙️ Admin"
+          },
+          "value": "admin"
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Recent Updates* (3)"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "block_id": "card_update_1",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*API Integration Complete*\n_Backend services now connected to Slack_"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "👤 Sarah Chen • 📅 2025-09-22 • ✅ completed"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "card_action_view",
+          "text": {
+            "type": "plain_text",
+            "text": "View Details"
+          },
+          "value": "update_1"
+        },
+        {
+          "type": "button",
+          "action_id": "card_action_edit",
+          "text": {
+            "type": "plain_text",
+            "text": "Edit"
+          },
+          "value": "update_1"
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "block_id": "card_update_2",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Database Migration*\n_Moving from SQLite to PostgreSQL_"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "👤 Alex Rodriguez • 📅 2025-09-21 • 🟢 active"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "card_action_view",
+          "text": {
+            "type": "plain_text",
+            "text": "View Details"
+          },
+          "value": "update_2"
+        },
+        {
+          "type": "button",
+          "action_id": "card_action_edit",
+          "text": {
+            "type": "plain_text",
+            "text": "Edit"
+          },
+          "value": "update_2"
+        }
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "block_id": "card_update_3",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*UI Redesign*\n_Implementing Notion-like interface_"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "👤 Emma Wilson • 📅 2025-09-20 • ⏳ pending"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "action_id": "card_action_view",
+          "text": {
+            "type": "plain_text",
+            "text": "View Details"
+          },
+          "value": "update_3"
+        },
+        {
+          "type": "button",
+          "action_id": "card_action_edit",
+          "text": {
+            "type": "plain_text",
+            "text": "Edit"
+          },
+          "value": "update_3"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "type": "modal",
+  "title": {
+    "type": "plain_text",
+    "text": "📝 Create Update"
+  },
+  "submit": {
+    "type": "plain_text",
+    "text": "Create"
+  },
+  "close": {
+    "type": "plain_text",
+    "text": "Cancel"
+  },
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Share your progress with the team*"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "input",
+      "block_id": "update_title",
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "title_input",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "What did you work on?"
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Title"
+      },
+      "hint": {
+        "type": "plain_text",
+        "text": "Brief description of your work"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "update_content",
+      "element": {
+        "type": "plain_text_input",
+        "action_id": "content_input",
+        "multiline": true,
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Describe your progress, any blockers, and next steps..."
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Details"
+      },
+      "hint": {
+        "type": "plain_text",
+        "text": "Include progress percentage, blockers, and ETA if applicable"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "update_progress",
+      "element": {
+        "type": "static_select",
+        "action_id": "progress_select",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Select progress"
+        },
+        "options": [
+          {
+            "text": {
+              "type": "plain_text",
+              "text": "🟢 0-25% - Just started"
+            },
+            "value": "0-25"
+          },
+          {
+            "text": {
+              "type": "plain_text",
+              "text": "🟡 25-50% - In progress"
+            },
+            "value": "25-50"
+          },
+          {
+            "text": {
+              "type": "plain_text",
+              "text": "🟠 50-75% - Almost done"
+            },
+            "value": "50-75"
+          },
+          {
+            "text": {
+              "type": "plain_text",
+              "text": "✅ 75-100% - Nearly complete"
+            },
+            "value": "75-100"
+          }
+        ]
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Progress"
+      },
+      "optional": true
+    },
+    {
+      "type": "input",
+      "block_id": "update_eta",
+      "element": {
+        "type": "datepicker",
+        "action_id": "eta_datepicker",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Select date"
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Expected completion"
+      },
+      "hint": {
+        "type": "plain_text",
+        "text": "When do you expect to finish this work?"
+      },
+      "optional": true
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "💡 *Tip:* Be specific about blockers and next steps to help your team understand your progress"
+        }
+      ]
+    }
+  ]
+}
