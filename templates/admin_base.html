@@ -5,37 +5,294 @@
   <title>Project Updates Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#f6f7f9}
-    header{background:#0f172a;color:#fff;padding:14px 20px}
-    a{color:#0f766e;text-decoration:none}
-    .wrap{max-width:1100px;margin:20px auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid #eee;vertical-align:top}
-    th{text-align:left;color:#334155}
-    .btn{display:inline-block;padding:8px 12px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
-    .btn.primary{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
-    .btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
-    .badge{padding:2px 8px;border-radius:999px;font-size:12px}
-    .badge.green{background:#dcfce7;color:#166534}
-    .badge.amber{background:#fef9c3;color:#a16207}
-    .badge.red{background:#fee2e2;color:#991b1b}
-    .flash{padding:10px;margin-bottom:12px;border-radius:8px}
-    .flash.success{background:#dcfce7;color:#166534}
-    .flash.error{background:#fee2e2;color:#991b1b}
-    form.inline{display:inline}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .row > .col{flex:1;min-width:260px}
-    input,select{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px}
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+      margin: 0;
+      background: #ffffff;
+      color: #37352f;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #e9e9e7;
+      padding: 12px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .logo {
+      font-weight: 600;
+      font-size: 16px;
+      color: #37352f;
+      text-decoration: none;
+    }
+    
+    .nav {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+    
+    .nav a {
+      color: #787774;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+    
+    .nav a:hover {
+      background: #f1f1ef;
+      color: #37352f;
+    }
+    
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    
+    .page-header {
+      margin-bottom: 32px;
+    }
+    
+    .page-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #37352f;
+      margin: 0 0 8px 0;
+    }
+    
+    .page-subtitle {
+      color: #787774;
+      font-size: 14px;
+      margin: 0;
+    }
+    
+    .card {
+      background: #ffffff;
+      border: 1px solid #e9e9e7;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e9e9e7;
+    }
+    
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #37352f;
+      margin: 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    
+    th {
+      text-align: left;
+      color: #787774;
+      font-weight: 500;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e9e9e7;
+      background: #fafafa;
+    }
+    
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #f1f1ef;
+      vertical-align: top;
+    }
+    
+    tr:hover {
+      background: #fafafa;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #e9e9e7;
+      background: #ffffff;
+      color: #37352f;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    
+    .btn:hover {
+      background: #f1f1ef;
+      border-color: #d9d9d7;
+    }
+    
+    .btn.primary {
+      background: #2383e2;
+      border-color: #2383e2;
+      color: #ffffff;
+    }
+    
+    .btn.primary:hover {
+      background: #1a73d1;
+      border-color: #1a73d1;
+    }
+    
+    .btn.danger {
+      background: #e16259;
+      border-color: #e16259;
+      color: #ffffff;
+    }
+    
+    .btn.danger:hover {
+      background: #d1544b;
+      border-color: #d1544b;
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .badge.green {
+      background: #d9f7be;
+      color: #389e0d;
+    }
+    
+    .badge.amber {
+      background: #fff7e6;
+      color: #d46b08;
+    }
+    
+    .badge.red {
+      background: #ffccc7;
+      color: #cf1322;
+    }
+    
+    .flash {
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .flash.success {
+      background: #d9f7be;
+      color: #389e0d;
+      border: 1px solid #b7eb8f;
+    }
+    
+    .flash.error {
+      background: #ffccc7;
+      color: #cf1322;
+      border: 1px solid #ffa39e;
+    }
+    
+    form.inline {
+      display: inline;
+    }
+    
+    .row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    
+    .row > .col {
+      flex: 1;
+      min-width: 280px;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e9e9e7;
+      border-radius: 6px;
+      font-size: 14px;
+      background: #ffffff;
+      transition: border-color 0.2s ease;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #2383e2;
+      box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1);
+    }
+    
+    label {
+      display: block;
+      font-weight: 500;
+      color: #37352f;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    
+    small {
+      color: #787774;
+      font-size: 12px;
+    }
+    
+    code {
+      background: #f1f1ef;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #787774;
+    }
+    
+    .empty-state h3 {
+      margin: 0 0 8px 0;
+      color: #37352f;
+    }
   </style>
 </head>
 <body>
 <header>
-  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
-    <div><strong>Project Updates — Admin</strong></div>
-    <nav>
-      <a href="{{ url_for('admin_users') }}" style="color:#fff;margin-right:16px">Users</a>
-      <a href="{{ url_for('admin_logout') }}" style="color:#fff">Logout</a>
+  <div class="header-content">
+    <a href="{{ url_for('admin_users') }}" class="logo">Project Updates</a>
+    <nav class="nav">
+      <a href="{{ url_for('admin_users') }}">Users</a>
+      <a href="{{ url_for('admin_logout') }}">Logout</a>
     </nav>
   </div>
 </header>

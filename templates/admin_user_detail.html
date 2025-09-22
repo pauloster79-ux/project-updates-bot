@@ -1,33 +1,126 @@
 {% extends "admin_base.html" %}
 {% block content %}
+<div class="page-header">
+  <h1 class="page-title">{{ user.display_name }}</h1>
+  <p class="page-subtitle">User details and update history</p>
+</div>
+
+<!-- User Info Card -->
 <div class="card">
-  <h2>{{ user.display_name }}</h2>
-  <p><strong>Slack:</strong> <code>{{ user.slack_user_id }}</code> &nbsp; <strong>Email:</strong> {{ user.email or "—" }}</p>
-  <p><strong>Timezone:</strong> {{ user.timezone }} &nbsp; <strong>Cadence:</strong> {{ user.cadence_days or 7 }}d</p>
-  <p><strong>Next due:</strong> {{ user.next_due_at or "—" }} &nbsp; <strong>Last prompt:</strong> {{ user.last_prompt_at or "—" }}</p>
-  <div style="margin-top:8px">
-    <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=user.id) }}"><button class="btn primary">Chase now</button></form>
-    <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=user.id) }}"><button class="btn">{{ "Pause" if user.is_active else "Resume" }}</button></form>
-    <a class="btn" href="{{ url_for('admin_users') }}">Back</a>
+  <div class="card-header">
+    <h3 class="card-title">User Information</h3>
+  </div>
+  <div class="row">
+    <div class="col">
+      <label>Display Name</label>
+      <p style="margin:0;font-weight:500">{{ user.display_name }}</p>
+    </div>
+    <div class="col">
+      <label>Slack ID</label>
+      <p style="margin:0"><code>{{ user.slack_user_id }}</code></p>
+    </div>
+    <div class="col">
+      <label>Email</label>
+      <p style="margin:0">{{ user.email or "—" }}</p>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <label>Timezone</label>
+      <p style="margin:0">{{ user.timezone }}</p>
+    </div>
+    <div class="col">
+      <label>Cadence</label>
+      <p style="margin:0">{{ user.cadence_days or 7 }} days</p>
+    </div>
+    <div class="col">
+      <label>Status</label>
+      <p style="margin:0">
+        <span class="badge {{ 'green' if user.is_active else 'amber' }}">
+          {{ 'Active' if user.is_active else 'Paused' }}
+        </span>
+      </p>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <label>Last Prompt</label>
+      <p style="margin:0">{{ user.last_prompt_at or "—" }}</p>
+    </div>
+    <div class="col">
+      <label>Next Due</label>
+      <p style="margin:0">{{ user.next_due_at or "—" }}</p>
+    </div>
+    <div class="col">
+      <label>Actions</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <form class="inline" method="post" action="{{ url_for('admin_users_chase', user_id=user.id) }}">
+          <button class="btn primary">Chase Now</button>
+        </form>
+        <form class="inline" method="post" action="{{ url_for('admin_users_toggle', user_id=user.id) }}">
+          <button class="btn">{{ "Pause" if user.is_active else "Resume" }}</button>
+        </form>
+        <a class="btn" href="{{ url_for('admin_users') }}">Back to Users</a>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="card" style="margin-top:14px">
-  <h3>Update history</h3>
-  <table>
-    <thead><tr><th>Responded</th><th>RAG</th><th>%</th><th>ETA</th><th>Summary</th><th>Blockers</th></tr></thead>
-    <tbody>
-      {% for u in updates %}
-      <tr>
-        <td>{{ u.responded_at or "—" }}</td>
-        <td>{{ u.rag or "—" }}</td>
-        <td>{{ u.progress_pct or "—" }}</td>
-        <td>{{ u.eta_date or "—" }}</td>
-        <td>{{ u.summary or "—" }}</td>
-        <td>{{ u.blockers or "—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- Update History -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Update History</h3>
+  </div>
+  {% if updates %}
+    <table>
+      <thead>
+        <tr>
+          <th>Responded</th>
+          <th>Progress</th>
+          <th>ETA</th>
+          <th>Summary</th>
+          <th>Blockers</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in updates %}
+        <tr>
+          <td>{{ u.responded_at or "—" }}</td>
+          <td>
+            {% if u.progress_pct %}
+              <span class="badge green">{{ u.progress_pct }}%</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ u.eta_date or "—" }}</td>
+          <td>
+            {% if u.summary %}
+              <div style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ u.summary }}">
+                {{ u.summary }}
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if u.blockers %}
+              <div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ u.blockers }}">
+                {{ u.blockers }}
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">
+      <h3>No updates yet</h3>
+      <p>This user hasn't submitted any updates yet</p>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}
