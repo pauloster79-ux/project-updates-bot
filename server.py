@@ -519,6 +519,129 @@ def project_hub_view():
     view = build_project_hub_view(user_id, project_id, active_tab)
     return jsonify(view)
 
+@app.route("/slack/project-hub-preview")
+def project_hub_preview():
+    """Preview the project hub as HTML"""
+    user_id = request.args.get("user_id", "U12345")
+    project_id = request.args.get("project_id", "p1")
+    active_tab = request.args.get("tab", "summary")
+    
+    view = build_project_hub_view(user_id, project_id, active_tab)
+    
+    # Convert Block Kit to HTML for preview
+    html_blocks = []
+    for block in view["blocks"]:
+        if block["type"] == "context":
+            text = block["elements"][0]["text"]
+            html_blocks.append(f'<div class="context">{text}</div>')
+        elif block["type"] == "section":
+            text = block["text"]["text"]
+            html_blocks.append(f'<div class="section">{text}</div>')
+        elif block["type"] == "divider":
+            html_blocks.append('<div class="divider"></div>')
+        elif block["type"] == "actions":
+            buttons = []
+            for element in block["elements"]:
+                style = "primary" if element.get("style") == "primary" else "secondary"
+                buttons.append(f'<button class="btn {style}">{element["text"]["text"]}</button>')
+            html_blocks.append(f'<div class="actions">{"" .join(buttons)}</div>')
+    
+    html_content = "\n".join(html_blocks)
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Project Hub Preview</title>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #f8f9fa;
+            }}
+            .context {{
+                color: #666;
+                font-size: 14px;
+                margin: 10px 0;
+                font-weight: 500;
+            }}
+            .section {{
+                background: white;
+                padding: 16px;
+                margin: 8px 0;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                line-height: 1.5;
+            }}
+            .divider {{
+                height: 1px;
+                background: #e1e5e9;
+                margin: 16px 0;
+            }}
+            .actions {{
+                display: flex;
+                gap: 8px;
+                margin: 16px 0;
+            }}
+            .btn {{
+                padding: 8px 16px;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                background: white;
+                cursor: pointer;
+                font-size: 14px;
+            }}
+            .btn.primary {{
+                background: #007bff;
+                color: white;
+                border-color: #007bff;
+            }}
+            .btn:hover {{
+                background: #f8f9fa;
+            }}
+            .btn.primary:hover {{
+                background: #0056b3;
+            }}
+            .preview-header {{
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }}
+            .preview-header h1 {{
+                margin: 0 0 10px 0;
+                color: #333;
+            }}
+            .preview-header p {{
+                margin: 0;
+                color: #666;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="preview-header">
+            <h1>📘 Project Hub Preview</h1>
+            <p>This is how your Slack Block Kit UI will look. The actual UI will be rendered inside Slack.</p>
+            <p><strong>Current State:</strong> Project: {project_id}, Tab: {active_tab}</p>
+        </div>
+        {html_content}
+        
+        <div class="preview-header" style="margin-top: 40px;">
+            <h2>🔗 Test Different Views</h2>
+            <p>
+                <a href="?project_id=p1&tab=summary">Summary Tab</a> | 
+                <a href="?project_id=p1&tab=tasks">Tasks Tab</a> | 
+                <a href="?project_id=p1&tab=risks">Risks Tab</a> | 
+                <a href="?project_id=p2&tab=summary">Website Refresh Project</a>
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
 # -----------------------------------------------------------------------------
 # Admin auth
 # -----------------------------------------------------------------------------
