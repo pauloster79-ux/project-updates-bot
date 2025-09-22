@@ -238,6 +238,288 @@ def slack_events():
     return ("", 200)
 
 # -----------------------------------------------------------------------------
+# Project Hub Slack UI
+# -----------------------------------------------------------------------------
+@app.route("/slack/project-hub", methods=["POST"])
+def slack_project_hub():
+    """Handle project hub interactions"""
+    payload = request.get_json(silent=True) or {}
+    app.logger.info(f"/slack/project-hub payload: {payload}")
+    
+    # Handle different action types
+    action_type = payload.get("type")
+    
+    if action_type == "block_actions":
+        # Handle button clicks and interactions
+        actions = payload.get("actions", [])
+        user_id = payload.get("user", {}).get("id")
+        
+        for action in actions:
+            action_id = action.get("action_id", "")
+            value = action.get("value", "")
+            
+            # Handle project navigation
+            if action_id.startswith("nav_open_"):
+                project_id = value
+                response = build_project_hub_view(user_id, project_id, "summary")
+                return jsonify(response)
+            
+            # Handle tab switching
+            elif action_id.startswith("tab_"):
+                tab = value
+                # Get current state from private_metadata
+                view = payload.get("view", {})
+                private_metadata = view.get("private_metadata", "{}")
+                try:
+                    state = json.loads(private_metadata)
+                    project_id = state.get("selectedProjectId", "p1")
+                except:
+                    project_id = "p1"
+                
+                response = build_project_hub_view(user_id, project_id, tab)
+                return jsonify(response)
+    
+    return jsonify({"ok": True})
+
+def build_project_hub_view(user_id, project_id="p1", active_tab="summary"):
+    """Build the project hub home view"""
+    # Sample data (in a real app, this would come from your database)
+    projects = [
+        {"id": "p1", "name": "AI Project Hub", "description": "Slack-native PM hub with Notion-like UI."},
+        {"id": "p2", "name": "Website Refresh", "description": "New marketing site & docs."}
+    ]
+    
+    tasks = [
+        {
+            "id": "t1", "projectId": "p1", "title": "Home view scaffold",
+            "status": "In Progress", "priority": "High", "owner": user_id,
+            "description": "Build header, nav, tabs, and summary.",
+            "dueDate": "2025-10-15", "lastUpdated": "2025-10-10"
+        },
+        {
+            "id": "t2", "projectId": "p1", "title": "Task card component",
+            "status": "To Do", "priority": "Medium", "owner": user_id,
+            "description": "Reusable builder for task rows/cards.",
+            "lastUpdated": "2025-10-10"
+        }
+    ]
+    
+    risks = [
+        {
+            "id": "r1", "projectId": "p1", "title": "Slack rate limits",
+            "description": "Rapid view updates might hit rate limits.",
+            "likelihood": "Medium", "impact": "High", "owner": user_id,
+            "mitigationPlan": "Batch updates; debounce actions.",
+            "status": "Open", "lastUpdated": "2025-10-10"
+        }
+    ]
+    
+    # Find selected project
+    selected_project = next((p for p in projects if p["id"] == project_id), projects[0])
+    project_tasks = [t for t in tasks if t["projectId"] == project_id]
+    project_risks = [r for r in risks if r["projectId"] == project_id]
+    
+    # Build the view
+    blocks = []
+    
+    # Project navigation
+    blocks.append({
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": "*Projects*"}]
+    })
+    
+    for project in projects:
+        blocks.append({
+            "type": "section",
+            "block_id": f"nav_{project['id']}",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"{'•' if project['id'] == project_id else '◦'} *{project['name']}*"
+            },
+            "accessory": {
+                "type": "button",
+                "action_id": f"nav_open_{project['id']}",
+                "text": {"type": "plain_text", "text": "Open" if project['id'] == project_id else "View"},
+                "value": project['id']
+            }
+        })
+    
+    blocks.append({"type": "divider"})
+    
+    # Header
+    blocks.append({
+        "type": "section",
+        "block_id": "hdr",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*📘 {selected_project['name']}*\n_Your calm command center_"
+        }
+    })
+    
+    blocks.append({"type": "divider"})
+    
+    # Tabs
+    tabs = [
+        {"text": "Summary", "value": "summary"},
+        {"text": "Tasks", "value": "tasks"},
+        {"text": "Risks", "value": "risks"}
+    ]
+    
+    blocks.append({
+        "type": "actions",
+        "block_id": "tabs",
+        "elements": [
+            {
+                "type": "button",
+                "action_id": f"tab_{tab['value']}",
+                "text": {"type": "plain_text", "text": tab["text"]},
+                "style": "primary" if active_tab == tab["value"] else None,
+                "value": tab["value"]
+            } for tab in tabs
+        ]
+    })
+    
+    blocks.append({"type": "divider"})
+    
+    # Content based on active tab
+    if active_tab == "summary":
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Project Summary*\n{selected_project.get('description', '_No description_')}"
+            }
+        })
+        blocks.append({
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": f"*Tasks:* {len(project_tasks)}  •  *Risks:* {len(project_risks)}"}]
+        })
+    
+    elif active_tab == "tasks":
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "*Tasks*"},
+            "accessory": {
+                "type": "button",
+                "action_id": "task_new",
+                "text": {"type": "plain_text", "text": "New Task"}
+            }
+        })
+        blocks.append({"type": "divider"})
+        
+        if project_tasks:
+            for task in project_tasks:
+                blocks.append({
+                    "type": "section",
+                    "block_id": f"task_{task['id']}",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*🗂️ {task['title']}*  _({task['status']} • {task['priority']})_\n{task.get('description', '')}"
+                    },
+                    "accessory": {
+                        "type": "overflow",
+                        "action_id": f"task_menu_{task['id']}",
+                        "options": [
+                            {"text": {"type": "plain_text", "text": "Open"}, "value": f"open_{task['id']}"},
+                            {"text": {"type": "plain_text", "text": "Edit"}, "value": f"edit_{task['id']}"},
+                            {"text": {"type": "plain_text", "text": "Change status"}, "value": f"status_{task['id']}"},
+                            {"text": {"type": "plain_text", "text": "Archive"}, "value": f"archive_{task['id']}"}
+                        ]
+                    }
+                })
+                blocks.append({
+                    "type": "context",
+                    "elements": [{
+                        "type": "mrkdwn",
+                        "text": f"*Owner:* <@{task['owner']}>  •  *Due:* {task.get('dueDate', '—')}  •  *Updated:* {task['lastUpdated']}"
+                    }]
+                })
+                blocks.append({"type": "divider"})
+        else:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "*No tasks yet*\n_Add your first task to get rolling._"},
+                "accessory": {
+                    "type": "button",
+                    "action_id": "task_new",
+                    "text": {"type": "plain_text", "text": "Add Task"}
+                }
+            })
+    
+    elif active_tab == "risks":
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "*Risks*"},
+            "accessory": {
+                "type": "button",
+                "action_id": "risk_new",
+                "text": {"type": "plain_text", "text": "New Risk"}
+            }
+        })
+        blocks.append({"type": "divider"})
+        
+        if project_risks:
+            for risk in project_risks:
+                blocks.append({
+                    "type": "section",
+                    "block_id": f"risk_{risk['id']}",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*⚠️ {risk['title']}*  _({risk['likelihood']} × {risk['impact']})_\n{risk['description']}"
+                    },
+                    "accessory": {
+                        "type": "overflow",
+                        "action_id": f"risk_menu_{risk['id']}",
+                        "options": [
+                            {"text": {"type": "plain_text", "text": "Open"}, "value": f"open_{risk['id']}"},
+                            {"text": {"type": "plain_text", "text": "Edit"}, "value": f"edit_{risk['id']}"},
+                            {"text": {"type": "plain_text", "text": "Update status"}, "value": f"status_{risk['id']}"},
+                            {"text": {"type": "plain_text", "text": "Close risk"}, "value": f"close_{risk['id']}"}
+                        ]
+                    }
+                })
+                blocks.append({
+                    "type": "context",
+                    "elements": [{
+                        "type": "mrkdwn",
+                        "text": f"*Owner:* <@{risk['owner']}>  •  *Status:* {risk['status']}  •  *Updated:* {risk['lastUpdated']}"
+                    }]
+                })
+                blocks.append({"type": "divider"})
+        else:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "*No risks captured*\n_Add the first risk to start mitigation planning._"},
+                "accessory": {
+                    "type": "button",
+                    "action_id": "risk_new",
+                    "text": {"type": "plain_text", "text": "Add Risk"}
+                }
+            })
+    
+    # Build the view response
+    state = {
+        "selectedProjectId": project_id,
+        "activeTab": active_tab
+    }
+    
+    return {
+        "type": "home",
+        "private_metadata": json.dumps(state),
+        "blocks": blocks
+    }
+
+@app.route("/slack/project-hub-view")
+def project_hub_view():
+    """Serve the project hub view for testing"""
+    user_id = request.args.get("user_id", "U12345")
+    project_id = request.args.get("project_id", "p1")
+    active_tab = request.args.get("tab", "summary")
+    
+    view = build_project_hub_view(user_id, project_id, active_tab)
+    return jsonify(view)
+
+# -----------------------------------------------------------------------------
 # Admin auth
 # -----------------------------------------------------------------------------
 @app.route("/admin/login", methods=["GET", "POST"])
