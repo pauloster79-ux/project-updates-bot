@@ -1,28 +1,89 @@
 {% extends "admin_base.html" %}
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">Users</h1>
-  <p class="page-subtitle">Manage team members and their update preferences</p>
-</div>
-<!-- Search and Add User Section -->
-<div class="row">
-  <div class="col card">
-    <div class="card-header">
-      <h3 class="card-title">Search Users</h3>
-    </div>
-    <form method="get" style="display:flex;gap:12px;align-items:end">
-      <div style="flex:1">
-        <label>Search</label>
-        <input type="text" name="q" placeholder="Search by name, email, or Slack ID…" value="{{ q or '' }}">
-      </div>
-      <button class="btn">Search</button>
-      <a class="btn" href="/admin/users">Reset</a>
-    </form>
+  <h1 class="page-title">Team Members</h1>
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <p class="page-subtitle">Manage team members and their update preferences</p>
+    <button class="btn primary" onclick="document.getElementById('addUserModal').style.display='block'">Add User</button>
   </div>
+</div>
 
-  <div class="col card">
-    <div class="card-header">
-      <h3 class="card-title">Add New User</h3>
+<!-- Users Table -->
+<div class="card">
+  <div style="overflow-x: auto;">
+    <table style="min-width: 1200px;">
+      <thead>
+        <tr>
+          <th style="min-width: 120px;">Name</th>
+          <th style="min-width: 120px;">Slack ID</th>
+          <th style="min-width: 200px;">Email</th>
+          <th style="min-width: 120px;">Timezone</th>
+          <th style="min-width: 80px;">Cadence</th>
+          <th style="min-width: 150px;">Last Prompt</th>
+          <th style="min-width: 150px;">Next Due</th>
+          <th style="min-width: 300px;">Last Summary</th>
+          <th style="min-width: 80px;">Status</th>
+          <th style="min-width: 150px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>
+            <a href="/admin/users/{{ r.id }}" style="color:#2383e2;text-decoration:none;font-weight:500">
+              {{ r.display_name }}
+            </a>
+          </td>
+          <td><code>{{ r.slack_user_id }}</code></td>
+          <td>{{ r.email or '—' }}</td>
+          <td>{{ r.timezone or '—' }}</td>
+          <td>{{ r.cadence_days }}d</td>
+          <td>{{ r.last_prompt_at or '—' }}</td>
+          <td>{{ r.next_due_at or '—' }}</td>
+          <td>
+            {% if r.last_summary %}
+              <div style="max-width: 280px; word-wrap: break-word; white-space: normal;" title="{{ r.last_summary }}">
+                {{ r.last_summary }}
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {{ 'green' if r.is_active else 'amber' }}">
+              {{ 'Active' if r.is_active else 'Paused' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:8px">
+              <form class="inline" method="post" action="/admin/users/{{ r.id }}/chase">
+                <button class="btn primary">Chase</button>
+              </form>
+              <form class="inline" method="post" action="/admin/users/{{ r.id }}/toggle">
+                <button class="btn">{{ 'Pause' if r.is_active else 'Resume' }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="10" class="empty-state">
+            <h3>No users yet</h3>
+            <p>Add your first team member using the button above</p>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+  <div style="background-color: #ffffff; margin: 5% auto; padding: 24px; border-radius: 8px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <h2 style="margin: 0; color: #37352f;">Add New User</h2>
+      <button onclick="document.getElementById('addUserModal').style.display='none'" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #787774;">&times;</button>
     </div>
     <form method="post" action="/admin/users/new">
       <div class="row">
@@ -50,81 +111,11 @@
           <input name="cadence_days" type="number" min="1" value="7">
         </div>
       </div>
-      <div style="margin-top:16px">
-        <button class="btn primary">Add User</button>
+      <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: flex-end;">
+        <button type="button" class="btn" onclick="document.getElementById('addUserModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn primary">Add User</button>
       </div>
     </form>
   </div>
-</div>
-
-<!-- Users Table -->
-<div class="card">
-  <div class="card-header">
-    <h3 class="card-title">Team Members</h3>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Slack ID</th>
-        <th>Email</th>
-        <th>Timezone</th>
-        <th>Cadence</th>
-        <th>Last Prompt</th>
-        <th>Next Due</th>
-        <th>Last Summary</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>
-          <a href="/admin/users/{{ r.id }}" style="color:#2383e2;text-decoration:none;font-weight:500">
-            {{ r.display_name }}
-          </a>
-        </td>
-        <td><code>{{ r.slack_user_id }}</code></td>
-        <td>{{ r.email or '—' }}</td>
-        <td>{{ r.timezone or '—' }}</td>
-        <td>{{ r.cadence_days }}d</td>
-        <td>{{ r.last_prompt_at or '—' }}</td>
-        <td>{{ r.next_due_at or '—' }}</td>
-        <td>
-          {% if r.last_summary %}
-            <div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ r.last_summary }}">
-              {{ r.last_summary }}
-            </div>
-          {% else %}
-            —
-          {% endif %}
-        </td>
-        <td>
-          <span class="badge {{ 'green' if r.is_active else 'amber' }}">
-            {{ 'Active' if r.is_active else 'Paused' }}
-          </span>
-        </td>
-        <td>
-          <div style="display:flex;gap:8px">
-            <form class="inline" method="post" action="/admin/users/{{ r.id }}/chase">
-              <button class="btn primary">Chase</button>
-            </form>
-            <form class="inline" method="post" action="/admin/users/{{ r.id }}/toggle">
-              <button class="btn">{{ 'Pause' if r.is_active else 'Resume' }}</button>
-            </form>
-          </div>
-        </td>
-      </tr>
-    {% else %}
-      <tr>
-        <td colspan="10" class="empty-state">
-          <h3>No users yet</h3>
-          <p>Add your first team member using the form above</p>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
 </div>
 {% endblock %}
