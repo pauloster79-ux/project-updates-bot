@@ -173,14 +173,19 @@ def slack_events():
     if etype != "message":
         app.logger.info(f"Ignoring non-message event: {etype}")
         return ("", 200)
-    if subtype:
-        app.logger.info(f"Ignoring message with subtype={subtype}")
+    if subtype or event.get("bot_id") or event.get("user") == "USLACKBOT":
+        app.logger.info(f"Ignoring bot/system message subtype={subtype}, bot_id={event.get('bot_id')}")
         return ("", 200)
     if channel_type != "im":
         app.logger.info(f"Ignoring non-DM message channel_type={channel_type}")
         return ("", 200)
     if not user_id or not text_in:
         app.logger.info("Missing user or empty text; ignoring")
+        return ("", 200)
+    
+    # Check for retry headers to avoid reprocessing
+    if request.headers.get("X-Slack-Retry-Num"):
+        app.logger.info("Ignoring retry request")
         return ("", 200)
 
     app.logger.info(f"DM from {user_id}: {text_in}")
